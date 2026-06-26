@@ -300,13 +300,11 @@ python fusion/train_fusion.py
 
 ## Results
 
-| Stage | Metric | Value |
-|-------|--------|-------|
-| Behaviour Encoder | Val F1 | — |
-| GATv2 (graph) | Val F1 | — |
-| Fusion Network | Val F1 | — |
-
-> Results will be updated after full training runs.
+| Model             |              Accuracy |    Precision |       Recall |         F1 |                FPR |
+| ----------------- | --------------------: | -----------: | -----------: | ---------: | -----------------: |
+| Behaviour Encoder |                98.89% |        64.3% |        30.5% |  **42.0%** |          *Compute* |
+| Improved GATv2    | *(from training log)* | *(from log)* | *(from log)* |  **16.0%** |          *Compute* |
+| Fusion Network    |                83.07% |        5.94% |       88.78% | **12.68%** | ≈17.6% (estimated) |
 
 ---
 
