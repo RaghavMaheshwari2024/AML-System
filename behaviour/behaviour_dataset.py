@@ -24,6 +24,12 @@ class BehaviourDataset(Dataset):
 
         self.accounts = list(self.sequences.keys())
 
+        # Reverse mapping: account -> index
+        self.account_to_index = {
+            account: idx
+            for idx, account in enumerate(self.accounts)
+        }
+
         # Build categorical encodings
         self.payment_format_map = self._build_mapping("payment_format")
         self.currency_map = self._build_mapping("currency")

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from positional_encoding import PositionalEncoding
+from behaviour.positional_encoding import PositionalEncoding
 
 
 class BehaviourEncoder(nn.Module):

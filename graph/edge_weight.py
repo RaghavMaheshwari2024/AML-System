@@ -1,8 +1,6 @@
 import os
 import math
 import pickle
-import networkx as nx
-from datetime import datetime
 
 # ==========================================================
 # Configuration
@@ -14,123 +12,143 @@ OUTPUT_GRAPH = "data/processed/weighted_graph.pkl"
 LAMBDA = 0.001
 
 # ==========================================================
-# Load Graph
+# Script body — only runs when executed directly
 # ==========================================================
 
-print("Loading Graph...")
+if __name__ == "__main__":
 
-with open(INPUT_GRAPH, "rb") as f:
-    G = pickle.load(f)
+    import networkx as nx
+    from datetime import datetime
 
-print("Graph Loaded!")
+    # Load Graph
+    print("Loading Graph...")
 
-# ==========================================================
-# Find Latest Timestamp
-# ==========================================================
+    with open(INPUT_GRAPH, "rb") as f:
+        G = pickle.load(f)
 
-latest_timestamp = max(
-    datetime.strptime(
-        data["timestamp"], "%Y/%m/%d %H:%M"
-    )
-    for _, _, _, data in G.edges(keys=True, data=True)
-)
+    print("Graph Loaded!")
 
-
-# ==========================================================
-# Aggregate Transactions
-# ==========================================================
-
-edge_stats = {}
-
-for u, v, key, data in G.edges(keys=True, data=True):
-
-    edge = (u, v)
-
-    current_timestamp = datetime.strptime(
-        data["timestamp"], "%Y/%m/%d %H:%M"
+    # Find Latest Timestamp
+    latest_timestamp = max(
+        datetime.strptime(
+            data["timestamp"], "%Y/%m/%d %H:%M"
+        )
+        for _, _, _, data in G.edges(keys=True, data=True)
     )
 
-    if edge not in edge_stats:
 
-        edge_stats[edge] = {
-            "frequency": 0,
-            "weighted_amount": 0.0,
-            "latest_time": current_timestamp
-        }
+    # Aggregate Transactions
+    edge_stats = {}
 
-    edge_stats[edge]["frequency"] += 1
+    for u, v, key, data in G.edges(keys=True, data=True):
 
-    delta_t = latest_timestamp - current_timestamp
-    delta_t_seconds = delta_t.total_seconds()
+        edge = (u, v)
 
-    edge_stats[edge]["weighted_amount"] += (
-
-        math.log1p(data["amount_paid"])
-
-        * math.exp(-LAMBDA * delta_t_seconds)
-
-    )
-
-    edge_stats[edge]["latest_time"] = max(
-        edge_stats[edge]["latest_time"],
-        current_timestamp
-    )
-
-# ==========================================================
-# Compute Structural Overlap
-# sigma = |N_out(u) ∩ N_in(v)|
-# ==========================================================
-
-WG = nx.DiGraph()
-
-for (u, v), stats in edge_stats.items():
-
-    out_neighbors = set(G.successors(u))
-
-    in_neighbors = set(G.predecessors(v))
-
-    sigma = len(out_neighbors.intersection(in_neighbors))
-
-    structural_factor = 1 + math.log1p(sigma)
-
-    frequency_factor = math.log1p(stats["frequency"])
-
-    amount_factor = stats["weighted_amount"]
-
-    weight = (
-        frequency_factor
-        * amount_factor
-        * structural_factor
-    )
-
-    WG.add_edge(
-        u,
-        v,
-        weight=weight,
-        frequency=stats["frequency"],
-        sigma=sigma,
-        weighted_amount=amount_factor
-    )
-
-    for node in WG.nodes():
-
-        total = sum(
-            data["weight"]
-            for _, _, data in WG.out_edges(node, data=True)
+        current_timestamp = datetime.strptime(
+            data["timestamp"], "%Y/%m/%d %H:%M"
         )
 
-        WG.nodes[node]["out_weight_sum"] = total
+        if edge not in edge_stats:
+
+            edge_stats[edge] = {
+                "frequency": 0,
+                "weighted_amount": 0.0,
+                "latest_time": current_timestamp
+            }
+
+        edge_stats[edge]["frequency"] += 1
+
+        delta_t = latest_timestamp - current_timestamp
+        delta_t_seconds = delta_t.total_seconds()
+
+        edge_stats[edge]["weighted_amount"] += (
+            math.log1p(data["amount_paid"])
+            * math.exp(-LAMBDA * delta_t_seconds)
+        )
+
+        edge_stats[edge]["latest_time"] = max(
+            edge_stats[edge]["latest_time"],
+            current_timestamp
+        )
+
+    # Compute Structural Overlap  sigma = |N_out(u) ∩ N_in(v)|
+    WG = nx.DiGraph()
+
+    for (u, v), stats in edge_stats.items():
+
+        out_neighbors = set(G.successors(u))
+        in_neighbors  = set(G.predecessors(v))
+        sigma = len(out_neighbors.intersection(in_neighbors))
+
+        structural_factor = 1 + math.log1p(sigma)
+        frequency_factor  = math.log1p(stats["frequency"])
+        amount_factor     = stats["weighted_amount"]
+
+        weight = frequency_factor * amount_factor * structural_factor
+
+        WG.add_edge(
+            u, v,
+            weight=weight,
+            frequency=stats["frequency"],
+            sigma=sigma,
+            weighted_amount=amount_factor
+        )
+
+        for node in WG.nodes():
+            total = sum(
+                data["weight"]
+                for _, _, data in WG.out_edges(node, data=True)
+            )
+            WG.nodes[node]["out_weight_sum"] = total
+
+    # Save Weighted Graph
+    os.makedirs("data/processed", exist_ok=True)
+
+    with open(OUTPUT_GRAPH, "wb") as f:
+        pickle.dump(WG, f)
+
+    print("\nWeighted Graph Created Successfully!")
+    print(f"Nodes : {WG.number_of_nodes():,}")
+    print(f"Edges : {WG.number_of_edges():,}")
+
+
 
 # ==========================================================
-# Save Weighted Graph
+# Online helper — importable without triggering the script
 # ==========================================================
 
-os.makedirs("data/processed", exist_ok=True)
+def compute_edge_weight(
+    amount,
+    timestamp,
+    latest_timestamp=None,
+    frequency=1,
+    sigma=0,
+    lambda_decay=LAMBDA,
+    **kwargs
+):
+    """
+    Compute a single edge weight using the same formula as the offline pipeline.
 
-with open(OUTPUT_GRAPH, "wb") as f:
-    pickle.dump(WG, f)
+    Parameters
+    ----------
+    amount           : float — transaction amount
+    timestamp        : int   — Unix epoch of this transaction
+    latest_timestamp : int   — reference epoch for time-decay (defaults to timestamp)
+    frequency        : int   — past transactions on this edge (default 1)
+    sigma            : int   — structural overlap |N_out(u) ∩ N_in(v)| (default 0)
+    lambda_decay     : float — time-decay coefficient (default LAMBDA = 0.001)
 
-print("\nWeighted Graph Created Successfully!")
+    Returns
+    -------
+    float — edge weight
+    """
+    if latest_timestamp is None:
+        latest_timestamp = timestamp
 
-print(f"Nodes : {WG.number_of_nodes():,}")
-print(f"Edges : {WG.number_of_edges():,}")
+    delta_t_seconds = max(0, latest_timestamp - timestamp)
+
+    amount_factor     = math.log1p(amount) * math.exp(-lambda_decay * delta_t_seconds)
+    frequency_factor  = math.log1p(frequency)
+    structural_factor = 1 + math.log1p(sigma)
+
+    return frequency_factor * amount_factor * structural_factor

@@ -18,134 +18,181 @@ TOL = 1e-6
 # Load Data
 # ==========================================================
 
-print("Loading Graph...")
+class AMLPageRank:
+    def __init__(self, alpha=ALPHA, max_iter=MAX_ITER, tol=TOL):
+        self.alpha = alpha
+        self.max_iter = max_iter
+        self.tol = tol
+        risk_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "processed", "node_risk_scores.pkl")
+        with open(risk_file, "rb") as f:
+            self.personalization_raw = pickle.load(f)
 
-with open(GRAPH_FILE, "rb") as f:
-    G = pickle.load(f)
+    def compute(self, G):
+        nodes = list(G.nodes())
+        N = len(nodes)
+        if N == 0: return {}
+        total = sum(self.personalization_raw.get(node, 0.0) for node in nodes)
+        if total == 0: return {}
+        personalization = {node: self.personalization_raw.get(node, 0.0) / total for node in nodes}
+        
+        out_weight_sum = {
+            node: sum(G[node][nbr]["weight"] for nbr in G.successors(node))
+            for node in nodes
+        }
+        
+        pagerank = personalization.copy()
+        for iteration in range(self.max_iter):
+            dangling_mass = sum(pagerank[node] for node in nodes if out_weight_sum[node] == 0)
+            new_rank = {}
+            for node in nodes:
+                rank_sum = 0.0
+                for predecessor in G.predecessors(node):
+                    total_weight = out_weight_sum[predecessor]
+                    if total_weight > 0:
+                        rank_sum += pagerank[predecessor] * G[predecessor][node]["weight"] / total_weight
+                new_rank[node] = (1 - self.alpha) * personalization[node] + self.alpha * (rank_sum + dangling_mass * personalization[node])
+            
+            error = max(abs(new_rank[node] - pagerank[node]) for node in nodes)
+            pagerank = new_rank
+            if error < self.tol:
+                break
+        
+        maximum = max(pagerank.values()) if pagerank else 0
+        minimum = min(pagerank.values()) if pagerank else 0
+        if maximum == minimum:
+            return {node: 0.0 for node in pagerank}
+        return {node: (score - minimum) / (maximum - minimum) for node, score in pagerank.items()}
 
-print("Loading Initial Risk Scores...")
 
-with open(RISK_FILE, "rb") as f:
-    personalization_raw = pickle.load(f)
+if __name__ == "__main__":
+    print("Loading Graph...")
 
-nodes = list(G.nodes())
-N = len(nodes)
+    with open(GRAPH_FILE, "rb") as f:
+        G = pickle.load(f)
 
-print(f"Nodes : {N}")
+    print("Loading Initial Risk Scores...")
 
-if N == 0:
-    raise ValueError("Graph has no nodes.")
+    with open(RISK_FILE, "rb") as f:
+        personalization_raw = pickle.load(f)
 
-# ==========================================================
-# Normalize Personalization Vector
-# ==========================================================
+    nodes = list(G.nodes())
+    N = len(nodes)
 
-total = sum(personalization_raw.get(node, 0.0) for node in nodes)
-if total == 0:
-    raise ValueError("Personalization scores sum to zero.")
+    print(f"Nodes : {N}")
 
-personalization = {
-    node: personalization_raw.get(node, 0.0) / total
-    for node in nodes
-}
+    if N == 0:
+        raise ValueError("Graph has no nodes.")
 
-# ==========================================================
-# Precompute Outgoing Weight Sums
-# ==========================================================
+    # ==========================================================
+    # Normalize Personalization Vector
+    # ==========================================================
 
-out_weight_sum = {
-    node: sum(G[node][nbr]["weight"] for nbr in G.successors(node))
-    for node in nodes
-}
+    total = sum(personalization_raw.get(node, 0.0) for node in nodes)
+    if total == 0:
+        raise ValueError("Personalization scores sum to zero.")
 
-# ==========================================================
-# Initialize PageRank
-# ==========================================================
-
-pagerank = personalization.copy()
-
-# ==========================================================
-# Power Iteration
-# ==========================================================
-
-print("\nRunning Personalized PageRank...")
-
-for iteration in range(MAX_ITER):
-    # Handle dangling nodes: nodes with no outgoing weighted edges
-    dangling_mass = sum(
-        pagerank[node]
+    personalization = {
+        node: personalization_raw.get(node, 0.0) / total
         for node in nodes
-        if out_weight_sum[node] == 0
-    )
-
-    new_rank = {}
-
-    for node in nodes:
-        rank_sum = 0.0
-
-        for predecessor in G.predecessors(node):
-            total_weight = out_weight_sum[predecessor]
-            if total_weight > 0:
-                weight = G[predecessor][node]["weight"]
-                rank_sum += pagerank[predecessor] * weight / total_weight
-
-        # Redistribute dangling mass according to personalization
-        new_rank[node] = (
-            (1 - ALPHA) * personalization[node]
-            + ALPHA * (rank_sum + dangling_mass * personalization[node])
-        )
-
-    # Convergence check: maximum node-wise change
-    error = max(abs(new_rank[node] - pagerank[node]) for node in nodes)
-
-    pagerank = new_rank
-
-    print(f"Iteration {iteration + 1}  Error = {error:.15f}")
-
-    if error < TOL:
-        print("\nConverged!")
-        break
-else:
-    print("\nWarning: did not converge within MAX_ITER.")
-
-# ==========================================================
-# Optional: Normalize Final Scores to [0, 1]
-# ==========================================================
-
-maximum = max(pagerank.values())
-minimum = min(pagerank.values())
-
-if maximum == minimum:
-    pagerank = {node: 0.0 for node in pagerank}
-else:
-    pagerank = {
-        node: (score - minimum) / (maximum - minimum)
-        for node, score in pagerank.items()
     }
 
-# ==========================================================
-# Save Results
-# ==========================================================
+    # ==========================================================
+    # Precompute Outgoing Weight Sums
+    # ==========================================================
 
-os.makedirs("data/processed", exist_ok=True)
+    out_weight_sum = {
+        node: sum(G[node][nbr]["weight"] for nbr in G.successors(node))
+        for node in nodes
+    }
 
-with open(OUTPUT_FILE, "wb") as f:
-    pickle.dump(pagerank, f)
+    # ==========================================================
+    # Initialize PageRank
+    # ==========================================================
 
-print("\nPageRank Scores Saved!")
-print(f"Saved to : {OUTPUT_FILE}")
+    pagerank = personalization.copy()
 
-# ==========================================================
-# Print Top 10 Risky Nodes
-# ==========================================================
+    # ==========================================================
+    # Power Iteration
+    # ==========================================================
 
-print("\nTop 10 Highest Risk Nodes\n")
+    print("\nRunning Personalized PageRank...")
 
-top_nodes = sorted(
-    pagerank.items(),
-    key=lambda x: x[1],
-    reverse=True
-)[:10]
+    for iteration in range(MAX_ITER):
+        # Handle dangling nodes: nodes with no outgoing weighted edges
+        dangling_mass = sum(
+            pagerank[node]
+            for node in nodes
+            if out_weight_sum[node] == 0
+        )
 
-for node, score in top_nodes:
-    print(f"{node} : {score:.4f}")
+        new_rank = {}
+
+        for node in nodes:
+            rank_sum = 0.0
+
+            for predecessor in G.predecessors(node):
+                total_weight = out_weight_sum[predecessor]
+                if total_weight > 0:
+                    weight = G[predecessor][node]["weight"]
+                    rank_sum += pagerank[predecessor] * weight / total_weight
+
+            # Redistribute dangling mass according to personalization
+            new_rank[node] = (
+                (1 - ALPHA) * personalization[node]
+                + ALPHA * (rank_sum + dangling_mass * personalization[node])
+            )
+
+        # Convergence check: maximum node-wise change
+        error = max(abs(new_rank[node] - pagerank[node]) for node in nodes)
+
+        pagerank = new_rank
+
+        print(f"Iteration {iteration + 1}  Error = {error:.15f}")
+
+        if error < TOL:
+            print("\nConverged!")
+            break
+    else:
+        print("\nWarning: did not converge within MAX_ITER.")
+
+    # ==========================================================
+    # Optional: Normalize Final Scores to [0, 1]
+    # ==========================================================
+
+    maximum = max(pagerank.values())
+    minimum = min(pagerank.values())
+
+    if maximum == minimum:
+        pagerank = {node: 0.0 for node in pagerank}
+    else:
+        pagerank = {
+            node: (score - minimum) / (maximum - minimum)
+            for node, score in pagerank.items()
+        }
+
+    # ==========================================================
+    # Save Results
+    # ==========================================================
+
+    os.makedirs("data/processed", exist_ok=True)
+
+    with open(OUTPUT_FILE, "wb") as f:
+        pickle.dump(pagerank, f)
+
+    print("\nPageRank Scores Saved!")
+    print(f"Saved to : {OUTPUT_FILE}")
+
+    # ==========================================================
+    # Print Top 10 Risky Nodes
+    # ==========================================================
+
+    print("\nTop 10 Highest Risk Nodes\n")
+
+    top_nodes = sorted(
+        pagerank.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )[:10]
+
+    for node, score in top_nodes:
+        print(f"{node} : {score:.4f}")
