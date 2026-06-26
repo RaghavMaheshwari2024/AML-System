@@ -153,7 +153,7 @@ AML-System/
 
 ## Pipeline
 
-### 1 — Offline: Graph Construction
+### 1 - Offline: Graph Construction
 
 Builds the account-level transaction graph and computes AML-specific analytics.
 
@@ -183,7 +183,7 @@ python graph/persistent_risk_memory.py
 
 ---
 
-### 2 — Behaviour Encoder Training
+### 2 - Behaviour Encoder Training
 
 Trains a Transformer over per-account transaction sequences.
 
@@ -202,7 +202,7 @@ python extract_embeddings.py
 
 ---
 
-### 3 — GATv2 Graph Embedding Training
+### 3 - GATv2 Graph Embedding Training
 
 Trains the 2-layer GATv2 model on the full account graph using mini-batch neighbourhood sampling.
 
@@ -216,7 +216,7 @@ python gnn/train_gat.py
 
 ---
 
-### 4 — Fusion Network Training
+### 4 - Fusion Network Training
 
 Trains the Adaptive Gated Fusion Network on pre-computed local + graph embeddings.
 
