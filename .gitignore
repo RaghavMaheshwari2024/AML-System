@@ -87,6 +87,12 @@ htmlcov/
 secrets.json
 config/local*.json
 
+# ─── Evaluation Outputs ──────────────────────────────────
+evaluation/predictions.csv
+evaluation/top100_*.csv
+evaluation/*.png
+evaluation/*.json
+
 # ─── Temporary / Scratch ─────────────────────────────────
 tmp/
 temp/
