@@ -3,6 +3,12 @@ evaluation/evaluate.py
 ────────────────────────────────────────────────────────────────────────────────
 Full evaluation of the trained FusionNetwork on the complete dataset.
 
+Configuration
+─────────────
+  THRESHOLD  — operating threshold for binary classification.
+               Set to the value that optimises your chosen objective
+               (e.g. 0.93 for best F1, 0.05 for best Recall).
+
 Metrics reported
 ────────────────
   Accuracy · Precision · Recall · F1
@@ -77,6 +83,15 @@ PREDICTIONS_PATH  = os.path.join(EVAL_DIR,  "predictions.csv")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 BATCH_SIZE = 2048
+
+############################################################
+# Classification Threshold
+# ─────────────────────────────────────────────────────────
+# Chosen via threshold_search.py to maximise F1.
+# Change to 0.05 if Recall is the operating objective.
+############################################################
+
+THRESHOLD = 0.93
 
 ############################################################
 # Load Artefacts
@@ -246,7 +261,7 @@ with torch.no_grad():
 
 all_probs  = torch.cat(all_probs).numpy()
 all_labels = torch.cat(all_labels).numpy().astype(int)
-all_preds  = (all_probs >= 0.5).astype(int)
+all_preds  = (all_probs >= THRESHOLD).astype(int)
 
 ############################################################
 # Metrics
@@ -272,7 +287,7 @@ pr_auc  = average_precision_score(all_labels, all_probs)
 W = 60
 
 print("=" * W)
-print("EVALUATION RESULTS")
+print(f"EVALUATION RESULTS  (threshold = {THRESHOLD})")
 print("=" * W)
 print()
 

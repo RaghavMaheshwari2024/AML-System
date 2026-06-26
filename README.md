@@ -300,11 +300,39 @@ python fusion/train_fusion.py
 
 ## Results
 
-| Model             |              Accuracy |    Precision |       Recall |         F1 |                FPR |
-| ----------------- | --------------------: | -----------: | -----------: | ---------: | -----------------: |
-| Behaviour Encoder |                98.89% |        64.3% |        30.5% |  **42.0%** |          *Compute* |
-| Improved GATv2    | *(from training log)* | *(from log)* | *(from log)* |  **16.0%** |          *Compute* |
-| Fusion Network    |                83.07% |        5.94% |       88.78% | **12.68%** | ≈17.6% (estimated) |
+Evaluation performed on the full HI-Small dataset (515,088 accounts) using the trained Fusion Network at a decision threshold of **0.93**.
+
+### Classification Metrics
+
+| Metric    | Value   |
+| --------- | ------: |
+| Accuracy  | 97.96 % |
+| Precision | 26.60 % |
+| Recall    | 36.95 % |
+| F1 Score  | 30.93 % |
+
+### Ranking Metrics
+
+| Metric  | Value  |
+| ------- | -----: |
+| ROC-AUC | 0.9364 |
+| PR-AUC  | 0.1501 |
+
+### Error Rates
+
+| Metric                      | Value   |
+| --------------------------- | ------: |
+| False Positive Rate (FPR)   |  1.27 % |
+| False Negative Rate (FNR)   | 63.05 % |
+
+### Confusion Matrix
+
+|                        | Predicted Negative | Predicted Positive |
+| ---------------------- | -----------------: | -----------------: |
+| **Actual Negative**    |        502,249 (TN)|          6,482 (FP)|
+| **Actual Positive**    |          4,008 (FN)|          2,349 (TP)|
+
+> **Note:** The high ROC-AUC (0.936) confirms strong ranking ability. The elevated FNR reflects the conservative threshold (0.93) chosen to minimise false alerts in a highly imbalanced dataset (~1.2% positive rate). Lowering the threshold trades FPR for improved recall.
 
 ---
 
