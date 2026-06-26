@@ -1,0 +1,106 @@
+###############################################################
+# VigilNet / AML-System  —  .gitignore
+###############################################################
+
+# ─── Python ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.pyc
+
+# ─── Virtual Environments ────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env/
+
+# ─── Data Files (large / binary / sensitive) ─────────────
+# Raw source data
+data/raw/*.csv
+data/raw/*.parquet
+data/raw/*.xlsx
+data/raw/*.txt
+
+# Processed intermediate artifacts  (large binary pickles / tensors)
+data/processed/*.pkl
+data/processed/*.npy
+data/processed/*.pt
+data/processed/*.parquet
+data/processed/*.bin
+data/processed/*.h5
+data/processed/*.hdf5
+
+# ─── Trained Model Weights ───────────────────────────────
+models/*.pth
+models/*.pt
+models/*.ckpt
+models/*.bin
+models/*.safetensors
+
+# ─── Jupyter Notebooks outputs / checkpoints ─────────────
+notebooks/.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ─── Logs & Metrics ──────────────────────────────────────
+logs/
+runs/
+*.log
+tensorboard/
+lightning_logs/
+
+# ─── IDE / Editor ────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ─── OS ──────────────────────────────────────────────────
+Thumbs.db
+desktop.ini
+
+# ─── Build / Distribution ────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
+
+# ─── Testing & Coverage ──────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ─── Type checking ───────────────────────────────────────
+.mypy_cache/
+.pytype/
+
+# ─── Environment / Secrets ───────────────────────────────
+.env
+*.env
+secrets.json
+config/local*.json
+
+# ─── Temporary / Scratch ─────────────────────────────────
+tmp/
+temp/
+scratch/
+*.tmp
+*.bak
+
+# ─── Keep empty directory placeholders ───────────────────
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!models/.gitkeep
+!logs/.gitkeep
+!notebooks/.gitkeep
+!api/.gitkeep
+!offline/.gitkeep
+!online/.gitkeep
+!utils/.gitkeep
