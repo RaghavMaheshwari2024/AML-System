@@ -200,82 +200,25 @@ class OnlineAMLSystem:
         self.fusion.eval()
 
     ########################################################
-    # Predict
+    # Predict Account (helper)
     ########################################################
 
-    @torch.no_grad()
-
-    def predict(
-
-        self,
-
-        sender,
-
-        receiver,
-
-        transaction
-
-    ):
-
-        ####################################################
-        # Update Transaction History
-        ####################################################
-
-        self.transaction_processor.add_transaction(
-
-            sender,
-
-            receiver,
-
-            transaction
-
-        )
-
-        ####################################################
-        # Update Graph
-        ####################################################
-
-        self.graph_updater.add_transaction(
-
-            sender=sender,
-
-            receiver=receiver,
-
-            amount=transaction["amount"],
-
-            timestamp=transaction["timestamp"],
-
-            payment_format=transaction["payment_format"],
-
-            currency=transaction["currency"]
-
-        )
+    def predict_account(self, account):
+        """
+        Run the full inference pipeline for a single account:
+        Behaviour → Memory → Fusion → Graph → FusionNetwork
+        Returns the account's risk probability (float).
+        """
 
         ####################################################
         # Update Risk Memory
         ####################################################
 
-        memory = self.risk_updater.update(
-
-            sender
-
-        )
-
-        ####################################################
-        # Behaviour Sequence
-        ####################################################
-
-        sequence = self.transaction_processor.get_sequence(
-
-            sender
-
-        )
+        memory = self.risk_updater.update(account)
 
         ####################################################
         # Behaviour Preprocessing
         ####################################################
-
-        account = sender
 
         idx = self.dataset.account_to_index[account]
 
@@ -346,12 +289,12 @@ class OnlineAMLSystem:
         # Graph Embedding (precomputed)
         ####################################################
 
-        idx = self.account_to_idx[sender]
+        idx = self.account_to_idx[account]
 
         graph_embedding = self.graph_embeddings[idx].unsqueeze(0).to(DEVICE)
 
         ####################################################
-        # Final Prediction
+        # Fusion → Probability
         ####################################################
 
         logit = self.fusion(
@@ -362,21 +305,91 @@ class OnlineAMLSystem:
 
         )
 
-        probability = torch.sigmoid(
+        probability = torch.sigmoid(logit).item()
 
-            logit
+        return probability
 
-        ).item()
+    ########################################################
+    # Predict
+    ########################################################
+
+    @torch.no_grad()
+
+    def predict(
+
+        self,
+
+        sender,
+
+        receiver,
+
+        transaction
+
+    ):
+
+        ####################################################
+        # Update Transaction History
+        ####################################################
+
+        self.transaction_processor.add_transaction(
+
+            sender,
+
+            receiver,
+
+            transaction
+
+        )
+
+        ####################################################
+        # Update Graph
+        ####################################################
+
+        self.graph_updater.add_transaction(
+
+            sender=sender,
+
+            receiver=receiver,
+
+            amount=transaction["amount"],
+
+            timestamp=transaction["timestamp"],
+
+            payment_format=transaction["payment_format"],
+
+            currency=transaction["currency"]
+
+        )
+
+        ####################################################
+        # Compute Risk for Both Accounts
+        ####################################################
+
+        sender_probability = self.predict_account(sender)
+
+        receiver_probability = self.predict_account(receiver)
+
+        transaction_probability = max(
+
+            sender_probability,
+
+            receiver_probability
+
+        )
 
         prediction = int(
 
-            probability >= 0.93
+            transaction_probability >= 0.93
 
         )
 
         return {
 
-            "probability": probability,
+            "sender_probability": sender_probability,
+
+            "receiver_probability": receiver_probability,
+
+            "transaction_probability": transaction_probability,
 
             "prediction": prediction
 
