@@ -386,39 +386,39 @@ python online/online_inference.py
 
 ## Results
 
-Evaluation performed on the full HI-Small dataset (515,088 accounts) using the trained Fusion Network at a decision threshold of **0.93**.
+Evaluation performed on the **held-out test split** (77,264 accounts — 15% of the HI-Small dataset, never seen during training) using the trained Fusion Network at a decision threshold of **0.93**.
 
 ### Classification Metrics
 
 | Metric    | Value   |
 | --------- | ------: |
-| Accuracy  | 97.96 % |
-| Precision | 26.60 % |
-| Recall    | 36.95 % |
-| F1 Score  | 30.93 % |
+| Accuracy  | 97.55 % |
+| Precision | 20.93 % |
+| Recall    | 35.53 % |
+| F1 Score  | 26.34 % |
 
 ### Ranking Metrics
 
 | Metric  | Value  |
 | ------- | -----: |
-| ROC-AUC | 0.9364 |
-| PR-AUC  | 0.1501 |
+| ROC-AUC | 0.9208 |
+| PR-AUC  | 0.1266 |
 
 ### Error Rates
 
 | Metric                      | Value   |
 | --------------------------- | ------: |
-| False Positive Rate (FPR)   |  1.27 % |
-| False Negative Rate (FNR)   | 63.05 % |
+| False Positive Rate (FPR)   |  1.68 % |
+| False Negative Rate (FNR)   | 64.47 % |
 
 ### Confusion Matrix
 
 |                        | Predicted Negative | Predicted Positive |
 | ---------------------- | -----------------: | -----------------: |
-| **Actual Negative**    |        502,249 (TN)|          6,482 (FP)|
-| **Actual Positive**    |          4,008 (FN)|          2,349 (TP)|
+| **Actual Negative**    |        75,029 (TN) |         1,281 (FP) |
+| **Actual Positive**    |           615 (FN) |           339 (TP) |
 
-> **Note:** The high ROC-AUC (0.936) confirms strong ranking ability. The elevated FNR reflects the conservative threshold (0.93) chosen to minimise false alerts in a highly imbalanced dataset (~1.2% positive rate). Lowering the threshold trades FPR for improved recall.
+> **Note:** Metrics are computed on a stratified 15% test split that was held out during all training stages (Behaviour Encoder, GATv2, Fusion Network). The ROC-AUC of 0.921 on unseen accounts confirms genuine ranking ability. The elevated FNR reflects the conservative threshold (0.93) chosen to minimise false alerts in a highly imbalanced dataset (~1.2% positive rate).
 
 ---
 

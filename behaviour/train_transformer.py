@@ -1,13 +1,20 @@
 import os
+import sys
+import pickle
+from pathlib import Path
+
 import torch
 import torch.nn as nn
 
 from torch.utils.data import DataLoader
-from torch.utils.data import random_split
+from torch.utils.data import Subset
 
-from behaviour_dataset import BehaviourDataset
-from transformer_encoder import BehaviourEncoder
-from pathlib import Path
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from behaviour.behaviour_dataset import BehaviourDataset
+from behaviour.transformer_encoder import BehaviourEncoder
 
 
 ############################################################
@@ -26,14 +33,16 @@ LEARNING_RATE = 1e-4
 
 WEIGHT_DECAY = 1e-5
 
-TRAIN_RATIO = 0.8
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+DATA_DIR = PROJECT_ROOT / "data" / "processed"
 
 MODEL_DIR = PROJECT_ROOT / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 MODEL_PATH = MODEL_DIR / "behaviour_encoder.pth"
+
+SPLIT_FILE = DATA_DIR / "account_splits.pkl"
 
 
 print("MODEL PATH:")
@@ -47,27 +56,44 @@ os.makedirs(MODEL_DIR, exist_ok=True)
 
 print("Loading Dataset...")
 
-dataset = BehaviourDataset()
+dataset = BehaviourDataset(
+    DATA_DIR / "transaction_sequences.pkl"
+)
 
 print(f"Total Accounts : {len(dataset)}")
 
 ############################################################
-# Train / Validation Split
+# Load Global Split
 ############################################################
 
-train_size = int(
-    TRAIN_RATIO * len(dataset)
-)
+print("Loading Account Splits...")
 
-val_size = len(dataset) - train_size
+with open(SPLIT_FILE, "rb") as f:
+    splits = pickle.load(f)
 
-train_dataset, val_dataset = random_split(
+train_set = set(splits["train"])
+val_set = set(splits["val"])
 
-    dataset,
+train_indices = [
+    idx for idx, account in enumerate(dataset.accounts)
+    if account in train_set
+]
 
-    [train_size, val_size]
+val_indices = [
+    idx for idx, account in enumerate(dataset.accounts)
+    if account in val_set
+]
 
-)
+print(f"Train Accounts : {len(train_indices)}")
+print(f"Val Accounts   : {len(val_indices)}")
+
+############################################################
+# Train / Validation Subsets
+############################################################
+
+train_dataset = Subset(dataset, train_indices)
+
+val_dataset = Subset(dataset, val_indices)
 
 ############################################################
 # DataLoader

@@ -1,5 +1,12 @@
+import sys
+from pathlib import Path
+
 import torch
 import torch.nn as nn
+
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 from behaviour.positional_encoding import PositionalEncoding
 

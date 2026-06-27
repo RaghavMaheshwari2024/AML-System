@@ -462,38 +462,43 @@ graph_data = Data(
 )
 
 ############################################################
-# Train / Validation Split
+# Train / Validation Split (from global split file)
 ############################################################
 
 print()
 
-print("Creating Train / Validation Split...")
+print("Loading Account Splits...")
 
-############################################################
-# Train / Validation Split
-############################################################
+SPLIT_FILE = os.path.join(DATA_DIR, "account_splits.pkl")
+
+with open(SPLIT_FILE, "rb") as f:
+    splits = pickle.load(f)
+
+train_set = set(splits["train"])
+val_set = set(splits["val"])
 
 num_nodes = graph_data.num_nodes
-
-indices = torch.randperm(num_nodes)
-
-train_size = int(0.8 * num_nodes)
-
-train_indices = indices[:train_size]
-
-val_indices = indices[train_size:]
 
 train_mask = torch.zeros(num_nodes, dtype=torch.bool)
 
 val_mask = torch.zeros(num_nodes, dtype=torch.bool)
 
-train_mask[train_indices] = True
+for idx, account in enumerate(accounts):
 
-val_mask[val_indices] = True
+    if account in train_set:
+
+        train_mask[idx] = True
+
+    elif account in val_set:
+
+        val_mask[idx] = True
 
 graph_data.train_mask = train_mask
 
 graph_data.val_mask = val_mask
+
+print(f"  Train nodes : {train_mask.sum().item()}")
+print(f"  Val nodes   : {val_mask.sum().item()}")
 
 ############################################################
 # Keep Graph on CPU — subgraphs are pushed to GPU per-batch

@@ -1,7 +1,7 @@
 """
 evaluation/evaluate.py
 ────────────────────────────────────────────────────────────────────────────────
-Full evaluation of the trained FusionNetwork on the complete dataset.
+Evaluation of the trained FusionNetwork on the held-out TEST split.
 
 Configuration
 ─────────────
@@ -75,6 +75,7 @@ os.makedirs(EVAL_DIR, exist_ok=True)
 
 FUSION_MODEL_PATH = os.path.join(MODEL_DIR, "fusion_network.pth")
 PREDICTIONS_PATH  = os.path.join(EVAL_DIR,  "predictions.csv")
+SPLIT_FILE        = os.path.join(DATA_DIR,  "account_splits.pkl")
 
 ############################################################
 # Device
@@ -99,7 +100,7 @@ THRESHOLD = 0.93
 
 print()
 print("=" * 60)
-print("VigilNet  —  Evaluation")
+print("VigilNet  —  Evaluation (TEST split)")
 print("=" * 60)
 print()
 
@@ -122,10 +123,21 @@ with open(os.path.join(DATA_DIR, "transaction_sequences.pkl"), "rb") as f:
     transaction_sequences = pickle.load(f)
 
 ############################################################
-# Canonical Account List
+# Load Global Split — restrict to TEST accounts only
 ############################################################
 
-accounts = sorted(transaction_sequences.keys())
+print("Loading Account Splits …")
+with open(SPLIT_FILE, "rb") as f:
+    splits = pickle.load(f)
+
+test_set = set(splits["test"])
+
+accounts = sorted(
+    a for a in transaction_sequences.keys()
+    if a in test_set
+)
+
+print(f"  Test accounts : {len(accounts)}")
 
 ############################################################
 # Memory Feature Keys  (must match train_gat.py / train_fusion.py)
@@ -182,11 +194,30 @@ with torch.no_grad():
         local_embeddings.append(local_emb.squeeze(0).cpu())
         labels_list.append(transaction_sequences[account]["label"])
 
-local_embeddings = torch.stack(local_embeddings)   # (N, 128)
+local_embeddings = torch.stack(local_embeddings)   # (N_test, 128)
 labels           = torch.tensor(labels_list, dtype=torch.float32)
 
+############################################################
+# Select Graph Embeddings for Test Accounts
+# (graph_embeddings is stored in canonical sorted order of ALL accounts)
+############################################################
+
+all_accounts_sorted = sorted(transaction_sequences.keys())
+
+account_to_global_idx = {
+    account: idx
+    for idx, account in enumerate(all_accounts_sorted)
+}
+
+test_graph_indices = [
+    account_to_global_idx[account]
+    for account in accounts
+]
+
+graph_embeddings_test = graph_embeddings[test_graph_indices]
+
 print(f"  Local embeddings : {local_embeddings.shape}")
-print(f"  Graph embeddings : {graph_embeddings.shape}")
+print(f"  Graph embeddings : {graph_embeddings_test.shape}")
 print(f"  Labels           : {labels.shape}")
 
 ############################################################
@@ -206,7 +237,7 @@ class EvalDataset(Dataset):
         return self.local[idx], self.graph[idx], self.labels[idx]
 
 
-eval_dataset = EvalDataset(local_embeddings, graph_embeddings, labels)
+eval_dataset = EvalDataset(local_embeddings, graph_embeddings_test, labels)
 
 eval_loader  = DataLoader(
     eval_dataset,

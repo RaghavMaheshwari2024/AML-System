@@ -445,26 +445,35 @@ class FusionDataset(Dataset):
         )
 
 ############################################################
-# Train / Validation Split
+# Train / Validation Split (from global split file)
 ############################################################
 
-num_samples = len(labels)
+SPLIT_FILE = os.path.join(DATA_DIR, "account_splits.pkl")
 
-indices = torch.randperm(
+with open(SPLIT_FILE, "rb") as f:
+    splits = pickle.load(f)
 
-    num_samples
+account_index = {
 
-)
+    account: idx
 
-train_size = int(
+    for idx, account in enumerate(accounts)
 
-    0.8 * num_samples
+}
 
-)
+train_indices = [
+    account_index[a] for a in splits["train"]
+    if a in account_index
+]
 
-train_indices = indices[:train_size]
+val_indices = [
+    account_index[a] for a in splits["val"]
+    if a in account_index
+]
 
-val_indices = indices[train_size:]
+train_indices = torch.tensor(train_indices, dtype=torch.long)
+
+val_indices = torch.tensor(val_indices, dtype=torch.long)
 
 ############################################################
 # Train Dataset

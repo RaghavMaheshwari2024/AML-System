@@ -1,11 +1,18 @@
 import os
+import sys
 import pickle
+from pathlib import Path
+
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from behaviour_dataset import BehaviourDataset
-from transformer_encoder import BehaviourEncoder
+_ROOT = Path(__file__).resolve().parent.parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from behaviour.behaviour_dataset import BehaviourDataset
+from behaviour.transformer_encoder import BehaviourEncoder
 
 # ==========================================================
 # Configuration
