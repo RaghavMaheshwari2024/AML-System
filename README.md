@@ -14,6 +14,7 @@
   - [2 — Behaviour Encoder Training](#2--behaviour-encoder-training)
   - [3 — GATv2 Graph Embedding Training](#3--gatv2-graph-embedding-training)
   - [4 — Fusion Network Training](#4--fusion-network-training)
+  - [5 — Online Inference Pipeline](#5--online-inference-pipeline)
 - [Models](#models)
 - [Dataset](#dataset)
 - [Installation](#installation)
@@ -138,9 +139,14 @@ AML-System/
 │   ├── DATA_DICTIONARY.md
 │   └── GRAPH_SPECIFICATIONS.md
 │
+├── online/                      # Online inference pipeline
+│   ├── online_inference.py     # OnlineAMLSystem — dual-account scoring
+│   ├── transaction_processor.py # Maintains per-account transaction sequences
+│   ├── graph_updater.py        # Adds edges & recomputes edge weights live
+│   └── risk_memory_updater.py  # PageRank + community risk memory refresh
+│
 ├── api/                         # Inference API (WIP)
 ├── offline/                     # Offline pipeline orchestration (WIP)
-├── online/                      # Online inference pipeline (WIP)
 ├── notebooks/                   # Exploratory notebooks
 ├── utils/                       # Shared utilities
 │
@@ -226,6 +232,83 @@ python fusion/train_fusion.py
 
 ---
 
+### 5 — Online Inference Pipeline
+
+Real-time transaction scoring. The system ingests a new transaction and evaluates **both** the sender and receiver to produce a per-transaction fraud probability.
+
+#### Modules
+
+| Module | File | Responsibility |
+|--------|------|----------------|
+| `OnlineAMLSystem` | `online/online_inference.py` | Orchestrates the full pipeline; exposes `predict()` |
+| `TransactionProcessor` | `online/transaction_processor.py` | Maintains per-account transaction sequences (bounded deque) |
+| `GraphUpdater` | `online/graph_updater.py` | Adds new edges to the live graph & recomputes AML edge weights |
+| `RiskMemoryUpdater` | `online/risk_memory_updater.py` | Refreshes PageRank + community risk memory for queried accounts |
+
+#### Prediction Flow
+
+```
+New Transaction (sender, receiver, features)
+        │
+        ├──► TransactionProcessor.add_transaction()   # update sequences
+        ├──► GraphUpdater.add_transaction()            # update live graph
+        │
+        ├──► predict_account(sender)
+        │       ├── RiskMemoryUpdater.update(sender)
+        │       ├── BehaviourEncoder  →  behaviour embedding
+        │       ├── MemoryProjection  →  memory embedding
+        │       ├── FeatureFusion     →  local embedding
+        │       ├── Graph Embedding   (precomputed lookup)
+        │       └── FusionNetwork     →  sender_probability
+        │
+        ├──► predict_account(receiver)   # same pipeline
+        │       └── → receiver_probability
+        │
+        └──► transaction_probability = max(sender, receiver)
+             prediction = 1 if transaction_probability ≥ 0.93
+```
+
+#### Quick Start
+
+```python
+from online.online_inference import OnlineAMLSystem
+
+aml = OnlineAMLSystem()
+
+result = aml.predict(
+    sender="121_8123FB9B0",
+    receiver="10_8000EBD30",
+    transaction={
+        "amount": 38769.39,
+        "timestamp": 202209010021,
+        "payment_format": "Cheque",
+        "currency": "US Dollar",
+        "time_gap": 3600,
+        "in_degree": 14,
+        "out_degree": 9,
+    }
+)
+
+print(result)
+# {
+#   "sender_probability": 0.12,
+#   "receiver_probability": 0.87,
+#   "transaction_probability": 0.87,
+#   "prediction": 0
+# }
+```
+
+#### Output Schema
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `sender_probability` | `float` | Fraud risk score of the sender account (0–1) |
+| `receiver_probability` | `float` | Fraud risk score of the receiver account (0–1) |
+| `transaction_probability` | `float` | `max(sender, receiver)` — overall transaction risk |
+| `prediction` | `int` | `1` if `transaction_probability ≥ 0.93`, else `0` |
+
+---
+
 ## Models
 
 | Model | File | Architecture | Output |
@@ -294,6 +377,9 @@ python gnn/train_gat.py
 
 # 4. Train fusion network
 python fusion/train_fusion.py
+
+# 5. Run online inference (smoke test)
+python online/online_inference.py
 ```
 
 ---
